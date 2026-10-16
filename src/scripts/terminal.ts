@@ -1,7 +1,7 @@
 // The interactive terminal in the hero. Its "filesystem" is built from
 // src/data/site.ts, so it always matches the rest of the page.
 
-import { contact, experience, fetchInfo, profile, projects, skills } from '../data/site';
+import { contact, education, fetchInfo, profile, projects, skills } from '../data/site';
 import { matrixRain, nukeSite, prefersReducedMotion } from './effects';
 
 type Part = string | { text: string; cls?: string; href?: string; run?: string };
@@ -23,7 +23,7 @@ function fakeHash(s: string) {
 	return (h >>> 0).toString(16).padStart(8, '0').slice(0, 7);
 }
 
-const sections = ['about', 'projects', 'homelab', 'experience', 'contact'];
+const sections = ['about', 'projects', 'homelab', 'blog', 'education', 'contact'];
 
 const fs: DirNode = {
 	kind: 'dir',
@@ -43,14 +43,14 @@ const fs: DirNode = {
 				['}'],
 			];
 		}),
-		'experience.log': file(() =>
-			experience.flatMap((item, i): Line[] => [
-				[{ text: `commit ${fakeHash(item.org + item.role)}`, cls: 'warn' }, i === 0 ? ' (HEAD -> main)' : ''],
+		'education.log': file(() =>
+			education.flatMap((item, i): Line[] => [
+				[{ text: `commit ${fakeHash(item.org + item.program)}`, cls: 'warn' }, i === 0 ? ' (HEAD -> main)' : ''],
 				[{ text: 'Date:   ', cls: 'muted' }, item.period],
 				[],
-				[`    ${item.role} @ ${item.org}`],
+				[`    ${item.program} @ ${item.org}`],
 				...item.points.map((point): Line => [`    - ${point}`]),
-				...(i < experience.length - 1 ? [[]] : []),
+				...(i < education.length - 1 ? [[]] : []),
 			]),
 		),
 		'contact.txt': file(() =>
@@ -246,7 +246,7 @@ export function initTerminal(root: HTMLElement) {
 		about: { desc: 'who I am', run: () => catFile('~/about.md') },
 		projects: { desc: 'things I have built', run: () => commands.ls.run(['~/projects']) },
 		skills: { desc: 'what I work with', run: () => catFile('~/skills.json') },
-		experience: { desc: 'education & history', run: () => catFile('~/experience.log') },
+		education: { desc: 'where I study', run: () => catFile('~/education.log') },
 		contact: { desc: 'how to reach me', run: () => catFile('~/contact.txt') },
 		neofetch: {
 			desc: 'system info',
@@ -332,6 +332,7 @@ export function initTerminal(root: HTMLElement) {
 			},
 		},
 		map: { desc: 'explore my homelab', run: () => commands.goto.run(['homelab']) },
+		blog: { desc: 'posts about the lab', run: () => commands.goto.run(['blog']) },
 		clear: { desc: 'clear the screen', run: () => out.replaceChildren() },
 		exit: { desc: 'close the terminal', run: closeWindow },
 
@@ -345,7 +346,7 @@ export function initTerminal(root: HTMLElement) {
 		},
 		git: {
 			run: (args) =>
-				args[0] === 'log' ? catFile('~/experience.log') : print([`git: '${args[0] ?? ''}' is not available here. Try 'git log'.`]),
+				args[0] === 'log' ? catFile('~/education.log') : print([`git: '${args[0] ?? ''}' is not available here. Try 'git log'.`]),
 		},
 		sudo: {
 			run: async (args) => {

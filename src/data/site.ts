@@ -24,32 +24,45 @@ export const fetchInfo = [
 
 export const skills = {
 	languages: ['C++', 'Java', 'Python', 'SQL', 'HTML/CSS'],
-	tools: ['Astro', 'Git', 'Slack', 'Google Apps', 'Word'],
-	infra: ['Proxmox', 'Docker', 'TrueNAS SCALE', 'Nginx Proxy Manager', 'AdGuard Home'],
+	libraries: ['discord.py', 'asyncpg', 'NLTK', 'yt-dlp', 'ffmpeg'],
+	tools: ['Git', 'GitHub', 'PostgreSQL', 'Docker Compose', 'Astro'],
+	infra: ['Proxmox', 'Docker', 'TrueNAS SCALE', 'Nginx Proxy Manager', 'AdGuard Home', 'Tailscale'],
 	os: ['Linux', 'macOS', 'Windows'],
 	other: ['IT Management', 'Network Design', 'Virtualization'],
 };
 
-export const experience = [
+export const education = [
 	{
-		role: 'Computer Science',
+		program: 'Computer Science',
 		org: 'De Anza College',
 		period: '2023 - Present',
 		points: [] as string[],
 	},
 	{
-		role: 'Information and Computer Sciences (ICS)',
+		program: 'Information and Computer Sciences (ICS)',
 		org: 'University of Hawaiʻi at Mānoa',
 		period: '2021 - 2023',
 		points: [] as string[],
 	},
 ];
 
-export const projects = [
+// `highlight` is the hardest problem the project solved, shown under the description.
+// For a screenshot or GIF, drop it in public/projects/ and set `image: '/projects/octave.gif'`.
+export const projects: {
+	name: string;
+	description: string;
+	highlight?: string;
+	image?: string;
+	tech: string[];
+	url?: string;
+	anchor?: string;
+}[] = [
 	{
 		name: 'Octave',
 		description:
 			'A Discord music bot that plays YouTube songs and playlists in voice channels, with a paged queue, looping, and auto-leave, streaming audio through yt-dlp and ffmpeg.',
+		highlight:
+			"YouTube's stream URLs are signed and expire quickly, so each song is resolved the moment it starts playing rather than when it's queued, preferring direct HTTPS audio over HLS streams ffmpeg can't read reliably.",
 		tech: ['Python', 'discord.py', 'yt-dlp', 'ffmpeg', 'Docker'],
 		url: 'https://github.com/robbyunderdog/DiscordMusicBotOctave',
 	},
@@ -57,6 +70,8 @@ export const projects = [
 		name: 'BigBrother',
 		description:
 			'A Discord bot that scores every message with VADER sentiment analysis and keeps a per-server karma leaderboard, storing only the scores, never the messages.',
+		highlight:
+			'Moved from SQLite to Postgres and replaced app-level locking with a single atomic upsert, so messages arriving at the same time never lose a karma update.',
 		tech: ['Python', 'discord.py', 'NLTK', 'PostgreSQL', 'Docker'],
 		url: 'https://github.com/robbyunderdog/DiscordKarmaBotBigBrother',
 	},
@@ -64,6 +79,8 @@ export const projects = [
 		name: 'Urza',
 		description:
 			'A Discord bot for opening simulated Magic: The Gathering booster packs, building per-server collections, and trading duplicates up to rarer cards.',
+		highlight:
+			'Every card and set is cached from the Scryfall API into Postgres, so commands never wait on an outside API, and the pack simulator only rolls rarities a set actually printed.',
 		tech: ['Python', 'discord.py', 'PostgreSQL', 'Docker'],
 		url: 'https://github.com/robbyunderdog/Urza',
 	},

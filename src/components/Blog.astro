@@ -1,0 +1,81 @@
+---
+import { getCollection } from 'astro:content';
+import SectionHeading from './SectionHeading.astro';
+
+const posts = (await getCollection('blog', (p) => !p.data.draft)).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf(),
+);
+const fmt = (d: Date) => d.toISOString().slice(0, 10);
+---
+
+{posts.length > 0 && (
+	<section id="blog">
+		<SectionHeading command="ls -t ~/blog" />
+		<ul>
+			{posts.map((post) => (
+				<li>
+					<a href={`/blog/${post.id}`}>
+						<span class="date">{fmt(post.data.date)}</span>
+						<span class="title">{post.data.title}</span>
+						<span class="desc">{post.data.description}</span>
+					</a>
+				</li>
+			))}
+		</ul>
+	</section>
+)}
+
+<style>
+	ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		border-top: 1px solid var(--border);
+	}
+
+	a {
+		display: grid;
+		grid-template-columns: 7rem 1fr;
+		gap: 0 1.5rem;
+		padding: 0.9rem 0.25rem;
+		border-bottom: 1px solid var(--border);
+		color: inherit;
+		transition: background 0.15s;
+	}
+
+	a:hover {
+		text-decoration: none;
+		background: var(--bg-raised);
+	}
+
+	a:hover .title {
+		color: var(--accent);
+	}
+
+	.date {
+		grid-row: span 2;
+		color: var(--warn);
+		font-size: 0.85rem;
+		padding-top: 0.1rem;
+	}
+
+	.title {
+		color: var(--accent-2);
+		font-weight: 700;
+	}
+
+	.desc {
+		color: var(--muted);
+		font-size: 0.875rem;
+	}
+
+	@media (max-width: 600px) {
+		a {
+			grid-template-columns: 1fr;
+		}
+
+		.date {
+			grid-row: auto;
+		}
+	}
+</style>

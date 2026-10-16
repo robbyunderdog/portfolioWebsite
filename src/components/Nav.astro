@@ -1,17 +1,38 @@
 ---
 import { profile } from '../data/site';
 
-const links = ['about', 'projects', 'homelab', 'experience', 'contact'];
+// root-relative, so the links also work from blog posts
+const links = ['about', 'projects', 'homelab', 'blog', 'education', 'contact'];
 ---
 
 <header>
 	<nav>
-		<a href="#top" class="home">~/{profile.handle}</a>
+		<a href="/" class="home">~/{profile.handle}</a>
 		<ul>
-			{links.map((link) => <li><a href={`#${link}`}>./{link}</a></li>)}
+			{links.map((link) => <li><a href={`/#${link}`}>./{link}</a></li>)}
 		</ul>
 	</nav>
 </header>
+
+<script>
+	// Scroll to sections without leaving `#section` in the URL.
+	const onHome = () => location.pathname === '/';
+
+	document.querySelectorAll<HTMLAnchorElement>('header a[href^="/#"]').forEach((link) => {
+		link.addEventListener('click', (event) => {
+			if (!onHome()) return; // from a blog post, let the browser load /#section
+			const target = document.getElementById(link.hash.slice(1));
+			if (!target) return;
+			event.preventDefault();
+			target.scrollIntoView({ behavior: 'smooth' });
+		});
+	});
+
+	// Arriving from another page via /#section: the browser has already jumped there, so drop the hash.
+	if (onHome() && location.hash) {
+		history.replaceState(null, '', location.pathname + location.search);
+	}
+</script>
 
 <style>
 	header {

@@ -1,0 +1,127 @@
+---
+import { getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import Nav from '../../components/Nav.astro';
+import { profile } from '../../data/site';
+
+export async function getStaticPaths() {
+	const posts = await getCollection('blog', (p) => !p.data.draft);
+	return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const date = post.data.date.toISOString().slice(0, 10);
+---
+
+<Layout title={`${post.data.title} · ${profile.name}`} description={post.data.description}>
+	<Nav />
+	<main>
+		<article>
+			<p class="prompt">cat ~/blog/{post.id}.md</p>
+			<h1>{post.data.title}</h1>
+			<p class="meta">
+				<span class="date">{date}</span>
+				{post.data.tags.map((tag) => <span class="tag">#{tag}</span>)}
+			</p>
+			<div class="body">
+				<Content />
+			</div>
+			<p class="back"><a href="/#blog">cd ~/blog</a></p>
+		</article>
+	</main>
+	<footer>
+		<p class="comment">&copy; {new Date().getFullYear()} {profile.name}</p>
+	</footer>
+</Layout>
+
+<style>
+	article {
+		max-width: 72ch;
+		margin: 0 auto;
+		padding: 3rem 0 1rem;
+	}
+
+	h1 {
+		font-size: 1.6rem;
+		margin-top: 0.5rem;
+	}
+
+	.meta {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 1rem;
+		margin: 0.5rem 0 2rem;
+		font-size: 0.85rem;
+	}
+
+	.date {
+		color: var(--warn);
+	}
+
+	.tag {
+		color: var(--muted);
+	}
+
+	.body :global(h2) {
+		font-size: 1.15rem;
+		margin: 2.25rem 0 0.75rem;
+		color: var(--accent);
+	}
+
+	.body :global(h2)::before {
+		content: '## ';
+		color: var(--muted);
+	}
+
+	.body :global(ul) {
+		padding-left: 1.25rem;
+	}
+
+	.body :global(li) {
+		margin: 0.35rem 0;
+	}
+
+	.body :global(code) {
+		font-family: inherit;
+		font-size: 0.9em;
+		color: var(--warn);
+	}
+
+	.body :global(pre) {
+		padding: 1rem 1.25rem;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		overflow-x: auto;
+		font-size: 0.85rem;
+	}
+
+	.body :global(pre code) {
+		color: inherit;
+	}
+
+	.body :global(blockquote) {
+		margin: 1.25rem 0;
+		padding-left: 1rem;
+		border-left: 2px solid var(--accent);
+		color: var(--muted);
+	}
+
+	.back {
+		margin-top: 3rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--border);
+	}
+
+	.back a::before {
+		content: '$ ';
+		color: var(--accent);
+	}
+
+	footer {
+		text-align: center;
+		padding: 2rem 1rem;
+		border-top: 1px solid var(--border);
+		font-size: 0.8rem;
+	}
+</style>
