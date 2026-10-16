@@ -1,0 +1,10 @@
+# Force HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [L,R=301]
+
+# Custom 404 page
+ErrorDocument 404 /404.html
+
+# Don't list directory contents
+Options -Indexes
