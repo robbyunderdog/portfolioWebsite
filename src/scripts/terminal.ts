@@ -23,7 +23,7 @@ function fakeHash(s: string) {
 	return (h >>> 0).toString(16).padStart(8, '0').slice(0, 7);
 }
 
-const sections = ['about', 'projects', 'experience', 'contact'];
+const sections = ['about', 'projects', 'homelab', 'experience', 'contact'];
 
 const fs: DirNode = {
 	kind: 'dir',
@@ -331,6 +331,7 @@ export function initTerminal(root: HTMLElement) {
 				document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 			},
 		},
+		map: { desc: 'explore my homelab', run: () => commands.goto.run(['homelab']) },
 		clear: { desc: 'clear the screen', run: () => out.replaceChildren() },
 		exit: { desc: 'close the terminal', run: closeWindow },
 
@@ -389,19 +390,17 @@ export function initTerminal(root: HTMLElement) {
 					await sleep(1200);
 					return print([`ssh: connect to host ${host} port 22: Connection timed out`]);
 				}
-				const homelab = projects.find((p) => slug(p.name) === 'homelab');
 				const steps: [number, Line][] = [
 					[300, [`Connecting to ${host}...`]],
 					[700, ['Offering public key: visitor@portfolio']],
 					[900, [{ text: 'Permission denied (publickey).', cls: 'err' }]],
 					[500, []],
-					[300, [{ text: "Nice try. The homelab stays private, but here's what runs on it:", cls: 'muted' }]],
+					[300, [{ text: 'Nice try. The homelab stays private, but you can explore a map of it: ', cls: 'muted' }, { text: 'map', run: 'map' }]],
 				];
 				for (const [ms, line] of steps) {
 					await sleep(ms);
 					print(line);
 				}
-				if (homelab) print(['  ' + homelab.tech.join(' · ')]);
 			},
 		},
 		vim: { run: () => print(["You'd never make it out alive. Editors are disabled for your safety."]) },

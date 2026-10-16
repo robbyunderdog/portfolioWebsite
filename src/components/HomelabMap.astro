@@ -1,0 +1,694 @@
+---
+// Interactive homelab diagram. The whole layout (boxes, links, and traffic routes) is
+// computed here at build time from `homelab` in site.ts, once wide for desktop and once
+// tall for phones. src/scripts/homelab-map.ts only adds hover info and animation.
+import SectionHeading from './SectionHeading.astro';
+import { homelab } from '../data/site';
+
+type Pt = [number, number];
+type Rect = { x: number; y: number; w: number; h: number };
+type Chip = Rect & { id: string; label: string };
+type Vm = Rect & { id: string; name: string; os: string; chips: Chip[]; disks: Rect[]; poolLabel?: string };
+type Host = Rect & { id: string; name: string; meta: string; vms: Vm[] };
+type Top = Rect & { label: string };
+type Anchor = { cx: number; cy: number; top?: boolean; gutter?: number; vm?: string; host?: string; lane?: number };
+type Layout = {
+	name: 'wide' | 'tall';
+	width: number;
+	height: number;
+	tops: Record<'internet' | 'lan' | 'remote', Top>;
+	cluster: Rect;
+	hosts: Host[];
+	links: string[];
+	storage: string[];
+	busY: number;
+	trunkX: number;
+	anchors: Record<string, Anchor>;
+};
+type HostData = (typeof homelab.hosts)[number];
+type VmData = HostData['vms'][number];
+
+const CHIP_H = 26;
+const CHIP_GAP = 6;
+const VM_PAD = 10;
+const VM_HEAD = 46;
+const GUTTER = 12; // lane on the right of each VM that traffic travels along
+const HOST_PAD = 12;
+const HOST_HEAD = 46;
+const VM_GAP = 12;
+const HOST_GAP = 20;
+const DISK_H = 30;
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const cx = (r: Rect) => r.x + r.w / 2;
+const cy = (r: Rect) => r.y + r.h / 2;
+
+function buildVm(vm: VmData, x: number, y: number, w: number, cols: number): Vm {
+	const services = vm.services ?? [];
+	const chipW = (w - 2 * VM_PAD - GUTTER - (cols - 1) * CHIP_GAP) / cols;
+	const chips = services.map((s, i) => ({
+		id: slug(s.name),
+		label: s.name,
+		x: x + VM_PAD + (i % cols) * (chipW + CHIP_GAP),
+		y: y + VM_HEAD + Math.floor(i / cols) * (CHIP_H + CHIP_GAP),
+		w: chipW,
+		h: CHIP_H,
+	}));
+	let bodyH = Math.ceil(services.length / cols) * (CHIP_H + CHIP_GAP) - CHIP_GAP;
+
+	let disks: Rect[] = [];
+	let poolLabel: string | undefined;
+	if (vm.pool) {
+		const perRow = 4;
+		const diskW = (w - 2 * VM_PAD - GUTTER - (perRow - 1) * CHIP_GAP) / perRow;
+		disks = Array.from({ length: vm.pool.disks }, (_, i) => ({
+			x: x + VM_PAD + (i % perRow) * (diskW + CHIP_GAP),
+			y: y + VM_HEAD + Math.floor(i / perRow) * (DISK_H + CHIP_GAP),
+			w: diskW,
+			h: DISK_H,
+		}));
+		bodyH = Math.ceil(vm.pool.disks / perRow) * (DISK_H + CHIP_GAP) + 16;
+		poolLabel = `${vm.pool.layout} · ${vm.pool.disks} × ${vm.pool.size}`;
+	}
+
+	return { id: slug(vm.name), name: vm.name, os: vm.os, x, y, w, h: VM_HEAD + bodyH + VM_PAD, chips, disks, poolLabel };
+}
+
+function anchorsFor(tops: Layout['tops'], hosts: Host[]) {
+	const anchors: Record<string, Anchor> = {};
+	for (const [id, r] of Object.entries(tops)) anchors[id] = { cx: cx(r), cy: cy(r), top: true };
+	for (const host of hosts) {
+		// lane just above the VMs, for traffic between VMs on the same host
+		const lane = host.y + HOST_HEAD - 5;
+		for (const vm of host.vms) {
+			const gutter = vm.x + vm.w - VM_PAD - GUTTER / 2;
+			const at = { gutter, vm: vm.id, host: host.id, lane };
+			// a VM's own anchor sits in its gutter: beside the disks for storage, by the header otherwise
+			const vmY = vm.disks.length ? (vm.disks[0].y + vm.disks.at(-1)!.y + DISK_H) / 2 : vm.y + 24;
+			anchors[vm.id] = { cx: gutter, cy: vmY, ...at };
+			for (const chip of vm.chips) anchors[chip.id] = { cx: cx(chip), cy: cy(chip), ...at };
+		}
+	}
+	return anchors;
+}
+
+function wideLayout(): Layout {
+	const width = 1100;
+	const margin = 12;
+	const hostCount = homelab.hosts.length;
+	const vmCount = homelab.hosts.reduce((n, h) => n + h.vms.length, 0);
+	const colW =
+		(width - 2 * margin - (vmCount - hostCount) * VM_GAP - hostCount * 2 * HOST_PAD - (hostCount - 1) * HOST_GAP) / vmCount;
+	const busY = 160;
+	const clusterY = 180;
+	const hostY = 200;
+
+	let x = margin;
+	const hosts: Host[] = homelab.hosts.map((h) => {
+		const vms = h.vms.map((vm, i) => buildVm(vm, x + HOST_PAD + i * (colW + VM_GAP), hostY + HOST_HEAD, colW, 1));
+		const w = h.vms.length * colW + (h.vms.length - 1) * VM_GAP + 2 * HOST_PAD;
+		const host = { id: h.id, name: h.name, meta: h.meta, x, y: hostY, w, h: 0, vms };
+		x += w + HOST_GAP;
+		return host;
+	});
+	// give every VM and host the same height so the row lines up
+	const vmH = Math.max(...hosts.flatMap((h) => h.vms.map((v) => v.h)));
+	for (const h of hosts) {
+		h.h = HOST_HEAD + vmH + HOST_PAD;
+		h.vms.forEach((v) => (v.h = vmH));
+	}
+
+	const tops = {
+		internet: { x: width / 2 - 80, y: 8, w: 160, h: 40, label: 'internet' },
+		lan: { x: width / 2 - 90, y: 88, w: 180, h: 40, label: 'ASUS router' },
+		remote: { x: width - margin - 190, y: 8, w: 190, h: 40, label: 'remote devices' },
+	};
+	const cluster = { x: 4, y: clusterY, w: width - 8, h: hostY - clusterY + hosts[0].h + 14 };
+
+	const links = [
+		`M ${cx(tops.remote) - tops.remote.w / 2} ${cy(tops.remote)} H ${tops.internet.x + tops.internet.w}`,
+		`M ${cx(tops.internet)} ${tops.internet.y + tops.internet.h} V ${tops.lan.y}`,
+		`M ${cx(tops.lan)} ${tops.lan.y + tops.lan.h} V ${busY}`,
+		`M ${cx(hosts[0])} ${busY} H ${cx(hosts.at(-1)!)}`,
+		...hosts.map((h) => `M ${cx(h)} ${busY} V ${h.y}`),
+	];
+
+	return {
+		name: 'wide',
+		width,
+		height: cluster.y + cluster.h + 14,
+		tops,
+		cluster,
+		hosts,
+		links,
+		storage: [],
+		busY,
+		trunkX: 0,
+		anchors: anchorsFor(tops, hosts),
+	};
+}
+
+function tallLayout(): Layout {
+	const width = 360;
+	const trunkX = width - 6;
+	const clusterW = width - 16;
+	const clusterY = 136;
+	const hostX = 8;
+	const hostW = clusterW - 16;
+	const vmW = hostW - 2 * HOST_PAD;
+
+	let y = clusterY + 16;
+	const hosts: Host[] = homelab.hosts.map((h) => {
+		let vy = y + HOST_HEAD;
+		const vms = h.vms.map((vm) => {
+			const box = buildVm(vm, hostX + HOST_PAD, vy, vmW, 2);
+			vy += box.h + VM_GAP;
+			return box;
+		});
+		const host = { id: h.id, name: h.name, meta: h.meta, x: hostX, y, w: hostW, h: vy - VM_GAP - y + HOST_PAD, vms };
+		y += host.h + 16;
+		return host;
+	});
+
+	const tops = {
+		remote: { x: 0, y: 8, w: 165, h: 40, label: 'remote devices' },
+		internet: { x: 179, y: 8, w: 165, h: 40, label: 'internet' },
+		lan: { x: 179, y: 72, w: 165, h: 40, label: 'ASUS router' },
+	};
+	const cluster = { x: 0, y: clusterY, w: clusterW, h: y - clusterY };
+	const last = hosts.at(-1)!;
+
+	const links = [
+		`M ${tops.remote.x + tops.remote.w} ${cy(tops.remote)} H ${tops.internet.x}`,
+		`M ${cx(tops.internet)} ${tops.internet.y + tops.internet.h} V ${tops.lan.y}`,
+		`M ${tops.lan.x + tops.lan.w} ${cy(tops.lan)} H ${trunkX} V ${last.y + 23}`,
+		...hosts.map((h) => `M ${trunkX} ${h.y + 23} H ${h.x + h.w}`),
+	];
+
+	return {
+		name: 'tall',
+		width,
+		height: cluster.y + cluster.h + 24,
+		tops,
+		cluster,
+		hosts,
+		links,
+		storage: [],
+		busY: 0,
+		trunkX,
+		anchors: anchorsFor(tops, hosts),
+	};
+}
+
+// Orthogonal route between two boxes: services exit through their VM's gutter, then
+// travel along the bus (wide) or trunk (tall) to the destination.
+function route(layout: Layout, from: string, to: string): Pt[] {
+	const a = layout.anchors[from];
+	const b = layout.anchors[to];
+	if (!a || !b) throw new Error(`homelab flow references unknown box "${!a ? from : to}"`);
+	if (a.top && b.top) return [[a.cx, a.cy], [b.cx, b.cy]];
+	// same VM, or same host on phones (where a host's VMs are stacked and share a gutter)
+	if (a.vm && (a.vm === b.vm || (layout.name === 'tall' && a.host === b.host))) {
+		return [[a.cx, a.cy], [a.gutter!, a.cy], [a.gutter!, b.cy], [b.cx, b.cy]];
+	}
+	if (a.host && a.host === b.host) {
+		return [[a.cx, a.cy], [a.gutter!, a.cy], [a.gutter!, a.lane!], [b.gutter!, a.lane!], [b.gutter!, b.cy], [b.cx, b.cy]];
+	}
+	if (layout.name === 'tall') {
+		return [[a.cx, a.cy], [layout.trunkX, a.cy], [layout.trunkX, b.cy], [b.cx, b.cy]];
+	}
+	const up: Pt[] = a.top ? [[a.cx, a.cy], [a.cx, layout.busY]] : [[a.cx, a.cy], [a.gutter!, a.cy], [a.gutter!, layout.busY]];
+	const down: Pt[] = b.top ? [[b.cx, layout.busY], [b.cx, b.cy]] : [[b.gutter!, layout.busY], [b.gutter!, b.cy], [b.cx, b.cy]];
+	return [...up, ...down];
+}
+
+function traceFlow(layout: Layout, path: string[]) {
+	const points: Pt[] = [];
+	const stops: { id: string; at: number }[] = [];
+	let length = 0;
+	const add = (p: Pt) => {
+		const prev = points.at(-1);
+		if (prev && prev[0] === p[0] && prev[1] === p[1]) return;
+		if (prev) length += Math.hypot(p[0] - prev[0], p[1] - prev[1]);
+		points.push(p);
+	};
+	path.forEach((id, i) => {
+		if (i === 0) {
+			const a = layout.anchors[id];
+			if (!a) throw new Error(`homelab flow references unknown box "${id}"`);
+			add([a.cx, a.cy]);
+		} else {
+			route(layout, path[i - 1], id).slice(1).forEach(add);
+		}
+		stops.push({ id, at: Math.round(length) });
+	});
+	return { d: toPath(points), stops };
+}
+
+const toPath = (points: Pt[]) => 'M ' + points.map((p) => p.map((n) => +n.toFixed(1)).join(' ')).join(' L ');
+
+// dashed links from the storage pool to every VM or service marked `storage: true`
+const allVms = homelab.hosts.flatMap((h) => h.vms);
+const pool = allVms.find((vm) => vm.pool);
+const storageUsers = allVms.flatMap((vm) => [
+	...(vm.storage ? [slug(vm.name)] : []),
+	...(vm.services ?? []).filter((s) => s.storage).map((s) => slug(s.name)),
+]);
+const storageLinks = (layout: Layout) =>
+	pool ? storageUsers.map((id) => toPath(route(layout, id, slug(pool.name)))) : [];
+
+const layouts = [wideLayout(), tallLayout()].map((layout) => ({ ...layout, storage: storageLinks(layout) }));
+
+// Text for the info panel, keyed by box id.
+const topInfo = {
+	internet: { title: 'internet', desc: 'Everything outside the house. Game traffic comes in through the router, and friends reach the media VM from out here through Tailscale.' },
+	lan: { title: 'ASUS router', desc: 'A basic ASUS router: the home network that connects every device and every node.' },
+	remote: { title: 'remote devices', desc: "Friends' devices outside the house, connected through Tailscale to the media VM only." },
+};
+const nodes: Record<string, { title: string; meta?: string; desc: string }> = { ...topInfo };
+for (const host of homelab.hosts) {
+	nodes[host.id] = { title: host.name, meta: host.meta, desc: host.desc };
+	for (const vm of host.vms) {
+		nodes[slug(vm.name)] = { title: `${vm.name} VM`, meta: `${vm.os} · on ${host.name}`, desc: vm.desc };
+		for (const s of vm.services ?? []) {
+			nodes[slug(s.name)] = { title: s.name, meta: `${vm.name} VM · ${host.name}`, desc: s.desc };
+		}
+	}
+}
+
+const vmCount = homelab.hosts.reduce((n, h) => n + h.vms.length, 0);
+// "services" rather than containers: some, like Paperless, are several containers each
+const serviceCount = homelab.hosts.flatMap((h) => h.vms).reduce((n, vm) => n + (vm.services?.length ?? 0), 0);
+const rawTb = homelab.hosts
+	.flatMap((h) => h.vms)
+	.reduce((n, vm) => n + (vm.pool ? vm.pool.disks * parseFloat(vm.pool.size) : 0), 0);
+const summary = `${homelab.hosts.length} nodes · ${vmCount} VMs · ${serviceCount} services · ${rawTb} TB raw storage`;
+
+// Every panel the info box can show. They are all rendered invisibly in the same grid
+// cell, so the box is always as tall as the longest one and never jumps while hovering.
+const panels = [
+	{ title: 'homelab', meta: summary, desc: 'Hover or tap any box to see what it does, or pick a trace to watch traffic move through the lab.' },
+	...Object.values(nodes),
+	...homelab.flows.map((f) => ({ title: f.title, desc: f.desc, steps: f.path.map((id) => nodes[id]?.title ?? id).join(' → ') })),
+];
+
+const mapData = {
+	nodes,
+	flows: Object.fromEntries(homelab.flows.map((f) => [f.id, { title: f.title, desc: f.desc, steps: f.path }])),
+};
+---
+
+<section id="homelab" data-homelab-map>
+	<SectionHeading command="./homelab --map" />
+	<p class="comment summary">{summary}</p>
+
+	<div class="controls" role="toolbar" aria-label="Traffic traces">
+		<span class="prompt">trace</span>
+		{homelab.flows.map((f) => <button type="button" data-play={f.id}>{f.title.toLowerCase()}</button>)}
+	</div>
+
+	{layouts.map((layout) => (
+		<svg
+			class={`map map-${layout.name}`}
+			viewBox={`0 0 ${layout.width} ${layout.height}`}
+			role="group"
+			aria-label="Diagram of my homelab"
+		>
+			<g class="links">
+				{layout.links.map((d) => <path d={d} />)}
+			</g>
+
+			<rect class="cluster" x={layout.cluster.x} y={layout.cluster.y} width={layout.cluster.w} height={layout.cluster.h} rx="10" />
+			<rect class="cluster-tag" x={layout.cluster.x + 12} y={layout.cluster.y + layout.cluster.h - 8} width="200" height="16" />
+			<text class="cluster-label" x={layout.cluster.x + 18} y={layout.cluster.y + layout.cluster.h + 4}>
+				proxmox cluster · {homelab.hosts.length} nodes
+			</text>
+			{layout.storage.length > 0 && (
+				<g class="legend" transform={`translate(${layout.cluster.x + layout.cluster.w - 150} ${layout.cluster.y + layout.cluster.h})`}>
+					<rect x="-8" y="-8" width="146" height="16" />
+					<path d="M 0 0 H 24" />
+					<text x="32" y="4">shared storage</text>
+				</g>
+			)}
+
+			{layout.hosts.map((host) => (
+				<g class="node host" data-id={host.id} data-kind="host" tabindex="0" role="button" aria-label={host.name}>
+					<rect x={host.x} y={host.y} width={host.w} height={host.h} rx="8" />
+					<text class="name" x={host.x + 12} y={host.y + 20}>{host.name}</text>
+					<text class="meta" x={host.x + 12} y={host.y + 36}>{host.meta}</text>
+				</g>
+			))}
+
+			{layout.hosts.flatMap((host) =>
+				host.vms.map((vm) => (
+					<g class="node vm" data-id={vm.id} data-kind="vm" data-host={host.id} tabindex="0" role="button" aria-label={`${vm.name} VM`}>
+						<rect x={vm.x} y={vm.y} width={vm.w} height={vm.h} rx="6" />
+						<text class="name" x={vm.x + 10} y={vm.y + 19}>{vm.name}</text>
+						<text class="meta" x={vm.x + 10} y={vm.y + 34}>{vm.os}</text>
+						{vm.disks.map((d, i) => (
+							<g class="disk">
+								<rect x={d.x} y={d.y} width={d.w} height={d.h} rx="3" />
+								<circle cx={d.x + d.w - 8} cy={d.y + d.h / 2} r="2.5" style={`animation-delay: -${(i * 0.37) % 1.7}s`} />
+							</g>
+						))}
+						{vm.poolLabel && (
+							<text class="meta" x={vm.x + 10} y={vm.disks.at(-1)!.y + DISK_H + 18}>{vm.poolLabel}</text>
+						)}
+					</g>
+				)),
+			)}
+
+			<g class="storage">
+				{layout.storage.map((d) => <path d={d} />)}
+			</g>
+
+			{/* traces sit above the VMs but below the boxes they connect, so they never cross a label */}
+			{homelab.flows.map((f) => {
+				const { d, stops } = traceFlow(layout, f.path);
+				return <path class="trace" data-flow={f.id} data-stops={JSON.stringify(stops)} d={d} />;
+			})}
+
+			{Object.entries(layout.tops).map(([id, r]) => (
+				<g class={`node top ${id}`} data-id={id} data-kind="top" tabindex="0" role="button" aria-label={r.label}>
+					<rect x={r.x} y={r.y} width={r.w} height={r.h} rx="6" />
+					<text x={cx(r)} y={cy(r)} text-anchor="middle" dominant-baseline="central">{r.label}</text>
+				</g>
+			))}
+
+			{layout.hosts.flatMap((host) =>
+				host.vms.flatMap((vm) =>
+					vm.chips.map((chip) => (
+						<g
+							class="node chip"
+							data-id={chip.id}
+							data-kind="chip"
+							data-vm={vm.id}
+							data-host={host.id}
+							tabindex="0"
+							role="button"
+							aria-label={chip.label}
+						>
+							{/* invisible hit area that covers half the gap on each side, so sweeping across
+							    the chips never falls through to the VM behind them */}
+							<rect class="hit" x={chip.x - CHIP_GAP / 2} y={chip.y - CHIP_GAP / 2} width={chip.w + CHIP_GAP} height={chip.h + CHIP_GAP} />
+							<rect x={chip.x} y={chip.y} width={chip.w} height={chip.h} rx="4" />
+							<text x={chip.x + 8} y={cy(chip)} dominant-baseline="central">{chip.label}</text>
+						</g>
+					)),
+				),
+			)}
+
+			<circle class="packet" r="4.5" cx="-20" cy="-20" />
+		</svg>
+	))}
+
+	<div class="info">
+		<div class="info-live" aria-live="polite">
+			<p class="info-title">{panels[0].title}</p>
+			<p class="info-meta">{panels[0].meta}</p>
+			<p class="info-desc">{panels[0].desc}</p>
+			<p class="info-steps"></p>
+		</div>
+		{panels.map((p) => (
+			<div class="info-sizer" aria-hidden="true">
+				<p class="info-title">{p.title}</p>
+				<p class="info-meta">{p.meta}</p>
+				<p class="info-desc">{p.desc}</p>
+				<p class="info-steps">{'steps' in p && p.steps}</p>
+			</div>
+		))}
+	</div>
+
+	<script type="application/json" is:inline data-map-data set:html={JSON.stringify(mapData)} />
+</section>
+
+<script>
+	import { initHomelabMap } from '../scripts/homelab-map';
+
+	const root = document.querySelector<HTMLElement>('[data-homelab-map]');
+	if (root) initHomelabMap(root);
+</script>
+
+<style>
+	.summary {
+		margin: -0.75rem 0 1.25rem;
+		font-size: 0.875rem;
+	}
+
+	.controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1.25rem;
+		font-size: 0.85rem;
+	}
+
+	.controls .prompt {
+		margin-right: 0.25rem;
+	}
+
+	.controls button {
+		font: inherit;
+		color: var(--muted);
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0.2rem 0.6rem;
+		cursor: pointer;
+	}
+
+	.controls button:hover,
+	.controls button.active {
+		color: var(--accent);
+		border-color: var(--accent);
+	}
+
+	.map {
+		display: block;
+		width: 100%;
+		height: auto;
+		overflow: visible;
+		font-family: var(--font);
+	}
+
+	.map-tall {
+		display: none;
+	}
+
+	@media (max-width: 700px) {
+		.map-wide {
+			display: none;
+		}
+
+		.map-tall {
+			display: block;
+		}
+	}
+
+	.links path {
+		fill: none;
+		stroke: var(--border);
+		stroke-width: 1.5;
+	}
+
+	.cluster {
+		fill: none;
+		stroke: var(--border);
+		stroke-dasharray: 5 5;
+	}
+
+	.cluster-tag,
+	.legend rect {
+		fill: var(--bg);
+	}
+
+	.storage path,
+	.legend path {
+		fill: none;
+		stroke: var(--accent-2);
+		stroke-width: 1.5;
+		stroke-dasharray: 4 4;
+		opacity: 0.55;
+	}
+
+	.legend text {
+		fill: var(--muted);
+	}
+
+	.cluster-label {
+		fill: var(--muted);
+		font-size: 12px;
+	}
+
+	text {
+		fill: var(--text);
+		font-size: 12px;
+	}
+
+	.name {
+		font-weight: 700;
+		font-size: 13px;
+	}
+
+	.host .name {
+		fill: var(--accent);
+	}
+
+	.meta {
+		fill: var(--muted);
+		font-size: 11px;
+	}
+
+	.map-tall .chip text {
+		font-size: 10.5px;
+	}
+
+	.node {
+		cursor: pointer;
+		outline: none;
+		transition: opacity 0.3s;
+	}
+
+	.node > rect {
+		stroke: var(--border);
+		stroke-width: 1;
+		transition: stroke 0.2s, fill 0.2s;
+	}
+
+	.map .node > rect.hit {
+		fill: transparent;
+		stroke: none;
+	}
+
+	.top > rect,
+	.chip > rect {
+		fill: var(--bg-raised);
+	}
+
+	.top.internet > rect,
+	.top.remote > rect {
+		stroke-dasharray: 4 3;
+	}
+
+	.host > rect {
+		fill: rgb(22 27 34 / 0.55);
+	}
+
+	.vm > rect {
+		fill: var(--bg);
+	}
+
+	.node:hover > rect,
+	.node:focus-visible > rect,
+	.node.lit > rect {
+		stroke: var(--accent);
+	}
+
+	.chip.lit > rect {
+		fill: rgb(63 185 80 / 0.15);
+	}
+
+	.map.dim .node:not(.lit) {
+		opacity: 0.35;
+	}
+
+	.disk rect {
+		fill: var(--bg-raised);
+		stroke: var(--border);
+	}
+
+	.disk circle {
+		fill: var(--accent);
+		animation: disk-activity 1.7s steps(1) infinite;
+	}
+
+	@keyframes disk-activity {
+		0%, 60% { opacity: 1; }
+		65%, 75% { opacity: 0.2; }
+		80% { opacity: 1; }
+		88% { opacity: 0.2; }
+	}
+
+	.trace {
+		fill: none;
+		stroke: var(--accent);
+		stroke-width: 2;
+		stroke-linejoin: round;
+		opacity: 0;
+		transition: opacity 0.3s;
+		filter: drop-shadow(0 0 3px var(--accent));
+		pointer-events: none;
+	}
+
+	.trace.on {
+		opacity: 0.9;
+		transition: none;
+	}
+
+	.packet {
+		fill: #d2ffd8;
+		opacity: 0;
+		filter: drop-shadow(0 0 6px var(--accent));
+		pointer-events: none;
+	}
+
+	.packet.on {
+		opacity: 1;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.disk circle {
+			animation: none;
+		}
+	}
+
+	.info {
+		display: grid;
+		margin-top: 1.25rem;
+		padding: 1rem 1.25rem;
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		font-size: 0.875rem;
+	}
+
+	.info > * {
+		grid-area: 1 / 1;
+	}
+
+	.info-sizer {
+		visibility: hidden;
+	}
+
+	.info p {
+		margin: 0;
+	}
+
+	.info p:empty {
+		display: none;
+	}
+
+	.info-title {
+		color: var(--accent);
+		font-weight: 700;
+	}
+
+	.info-meta {
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+
+	.info-desc {
+		margin-top: 0.4rem !important;
+	}
+
+	.info-steps {
+		margin-top: 0.4rem !important;
+		color: var(--muted);
+	}
+
+	.info-steps :global(.step.on) {
+		color: var(--accent);
+	}
+</style>

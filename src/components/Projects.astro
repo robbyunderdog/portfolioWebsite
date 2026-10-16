@@ -14,6 +14,7 @@ import { projects } from '../data/site';
 					{project.tech.map((tag) => <li>{tag}</li>)}
 				</ul>
 				{project.url && <a href={project.url} target="_blank" rel="noopener">view source &rarr;</a>}
+				{project.anchor && <a href={project.anchor}>explore the map &darr;</a>}
 			</article>
 		))}
 	</div>
@@ -22,7 +23,8 @@ import { projects } from '../data/site';
 <style>
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+		/* two columns on desktop, so four projects make a tidy 2×2 grid */
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
 		gap: 1rem;
 	}
 
