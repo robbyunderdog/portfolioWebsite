@@ -1,0 +1,123 @@
+:root {
+	--bg: #0d1117;
+	--bg-raised: #161b22;
+	--border: #30363d;
+	--text: #c9d1d9;
+	--muted: #8b949e;
+	--accent: #3fb950;
+	--accent-2: #58a6ff;
+	--warn: #d29922;
+	--font: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+	--max-width: 1120px;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	scroll-behavior: smooth;
+	scroll-padding-top: 4rem;
+}
+
+body {
+	margin: 0;
+	background-color: var(--bg);
+	/* soft green glows over a faint dot grid, so wide screens don't feel empty */
+	background-image:
+		radial-gradient(ellipse 60% 50% at 0% 0%, rgb(63 185 80 / 0.12), transparent 70%),
+		radial-gradient(ellipse 50% 50% at 100% 60%, rgb(88 166 255 / 0.08), transparent 70%),
+		radial-gradient(circle, rgb(139 148 158 / 0.18) 1px, transparent 1px);
+	background-size: 100% 100%, 100% 100%, 24px 24px;
+	background-attachment: fixed;
+	color: var(--text);
+	font-family: var(--font);
+	font-size: 15px;
+	line-height: 1.7;
+}
+
+a {
+	color: var(--accent-2);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.3;
+	margin: 0;
+}
+
+main {
+	max-width: var(--max-width);
+	margin: 0 auto;
+	padding: 0 1.5rem 4rem;
+}
+
+/* two columns on wide screens, stacked otherwise */
+.split {
+	display: grid;
+	gap: 0 4rem;
+}
+
+@media (min-width: 900px) {
+	.split {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+section {
+	padding: 3rem 0;
+}
+
+.prompt::before {
+	content: '$ ';
+	color: var(--accent);
+}
+
+.comment {
+	color: var(--muted);
+}
+
+.comment::before {
+	content: '// ';
+}
+
+/* terminal easter-egg overlays (see src/scripts/effects.ts) */
+.fx-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+}
+
+.fx-hint {
+	position: fixed;
+	bottom: 1.5rem;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 1001;
+	margin: 0;
+	padding: 0.25rem 0.75rem;
+	border-radius: 4px;
+	background: rgb(13 17 23 / 0.85);
+	color: var(--muted);
+	font-size: 0.8rem;
+}
+
+.fx-panic {
+	margin: 0;
+	padding: 2rem;
+	background: #000;
+	color: var(--text);
+	font: inherit;
+	font-size: 0.9rem;
+	white-space: pre-wrap;
+	overflow: hidden;
+	transition: opacity 0.4s;
+}

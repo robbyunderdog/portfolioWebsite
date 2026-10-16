@@ -1,0 +1,59 @@
+---
+import { profile } from '../data/site';
+
+const links = ['about', 'projects', 'experience', 'contact'];
+---
+
+<header>
+	<nav>
+		<a href="#top" class="home">~/{profile.handle}</a>
+		<ul>
+			{links.map((link) => <li><a href={`#${link}`}>./{link}</a></li>)}
+		</ul>
+	</nav>
+</header>
+
+<style>
+	header {
+		position: sticky;
+		top: 0;
+		z-index: 10;
+		background: color-mix(in srgb, var(--bg) 85%, transparent);
+		backdrop-filter: blur(6px);
+		border-bottom: 1px solid var(--border);
+	}
+
+	nav {
+		max-width: var(--max-width);
+		margin: 0 auto;
+		padding: 0.75rem 1.5rem;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 1.5rem;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.home {
+		color: var(--accent);
+		font-weight: 700;
+	}
+
+	ul {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 1.25rem;
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	ul a {
+		color: var(--muted);
+	}
+
+	ul a:hover {
+		color: var(--text);
+		text-decoration: none;
+	}
+</style>

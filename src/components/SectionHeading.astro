@@ -1,0 +1,16 @@
+---
+interface Props {
+	command: string;
+}
+
+const { command } = Astro.props;
+---
+
+<h2 class="prompt">{command}</h2>
+
+<style>
+	h2 {
+		font-size: 1.15rem;
+		margin-bottom: 1.5rem;
+	}
+</style>

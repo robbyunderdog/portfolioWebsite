@@ -1,0 +1,72 @@
+---
+import SectionHeading from './SectionHeading.astro';
+import { profile, skills } from '../data/site';
+
+const groups = Object.entries(skills);
+---
+
+<section id="about">
+	<SectionHeading command="cat about.md" />
+	<div class="split cols">
+		<div class="bio">
+			{profile.about.map((paragraph) => <p>{paragraph}</p>)}
+		</div>
+		<div class="skills">
+			<div class="comment">skills.json</div>
+			<div aria-hidden="true">&nbsp;</div>
+			<div>{'{'}</div>
+			{groups.map(([group, items], i) => (
+				<div class="entry">
+					<span><span class="key">"{group}"</span>: [</span>
+					{items.map((item, j) => (
+						<><span><span class="str">"{item}"</span>{j < items.length - 1 ? ',' : `]${i < groups.length - 1 ? ',' : ''}`}</span>{' '}</>
+					))}
+				</div>
+			))}
+			<div>{'}'}</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.cols {
+		gap: 1.5rem 3rem;
+	}
+
+	@media (min-width: 900px) {
+		.cols {
+			grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		}
+	}
+
+	.bio p:first-child {
+		margin-top: 0;
+	}
+
+	.skills {
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 1.25rem 1.5rem;
+		font-size: 0.875rem;
+		line-height: 1.75;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+	}
+
+	/* indented 2ch, with wrapped lines hanging a further 2ch in */
+	.entry {
+		padding-left: 4ch;
+		text-indent: -2ch;
+		margin: 0.35rem 0;
+	}
+
+	/* keep each item (and its comma) together when a line wraps */
+	.entry > span {
+		white-space: nowrap;
+	}
+
+	.key { color: var(--accent-2); }
+	.str { color: var(--warn); }
+</style>

@@ -1,0 +1,261 @@
+---
+import { Image } from 'astro:assets';
+import profilePic from '../assets/profile-pic.png';
+import Terminal from './Terminal.astro';
+import { fetchInfo, profile } from '../data/site';
+
+const palette = ['#ff5f56', '#ffbd2e', '#27c93f', '#58a6ff', '#bc8cff', '#39c5cf', '#c9d1d9'];
+---
+
+<section id="top" class="hero">
+	<div class="window" data-window>
+		<div class="titlebar">
+			<button type="button" class="dot red" data-action="close" aria-label="Close terminal"></button>
+			<button type="button" class="dot yellow" data-action="minimize" aria-label="Minimize terminal"></button>
+			<button type="button" class="dot green" data-action="maximize" aria-label="Maximize terminal"></button>
+			<span class="title">{profile.handle}@portfolio: ~</span>
+		</div>
+		<div class="body">
+			<div class="avatar">
+				<Image
+					src={profilePic}
+					alt={`Photo of ${profile.name}`}
+					width={600}
+					height={600}
+					loading="eager"
+				/>
+			</div>
+			<div class="text">
+				<p class="prompt">whoami</p>
+				<h1>{profile.name}</h1>
+				<p class="prompt">cat role.txt</p>
+				<p>{profile.tagline}</p>
+			</div>
+			<div class="fetch">
+				<p class="prompt">neofetch</p>
+				<p class="fetch-title">{profile.handle}<span>@</span>portfolio</p>
+				<p class="rule">{'-'.repeat(`${profile.handle}@portfolio`.length)}</p>
+				<dl>
+					{fetchInfo.map((row) => (
+						<>
+							<dt>{row.label}</dt>
+							<dd>{row.value}</dd>
+						</>
+					))}
+				</dl>
+				<div class="swatches" aria-hidden="true">
+					{palette.map((color) => <span style={`background:${color}`}></span>)}
+				</div>
+			</div>
+		</div>
+		<Terminal />
+	</div>
+	<button type="button" class="reopen" data-reopen hidden>$ ./portfolio --restore</button>
+</section>
+
+<style>
+	.hero {
+		padding-top: 4rem;
+	}
+
+	.window {
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		background: var(--bg-raised);
+		overflow: hidden;
+		box-shadow: 0 20px 50px rgb(0 0 0 / 0.4);
+		transition: transform 0.25s, opacity 0.25s;
+	}
+
+	.window.closing {
+		transform: scale(0.92);
+		opacity: 0;
+	}
+
+	.window.minimized .body,
+	.window.minimized :global(.terminal) {
+		display: none;
+	}
+
+	.window.minimized .titlebar {
+		border-bottom: 0;
+	}
+
+	.window.maximized {
+		position: fixed;
+		inset: 1rem;
+		z-index: 100;
+		display: flex;
+		flex-direction: column;
+		box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.6);
+	}
+
+	.window.maximized .body {
+		flex-shrink: 0;
+	}
+
+	.reopen {
+		font: inherit;
+		color: var(--accent);
+		background: var(--bg-raised);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 0.6rem 1rem;
+		cursor: pointer;
+	}
+
+	.reopen:hover {
+		border-color: var(--accent);
+	}
+
+	.titlebar {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 0.9rem;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.dot {
+		display: grid;
+		place-items: center;
+		width: 12px;
+		height: 12px;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		cursor: pointer;
+		font: 700 10px/1 var(--font);
+		color: rgb(0 0 0 / 0.6);
+	}
+
+	/* macOS-style symbols on hover */
+	.titlebar:hover .red::after { content: '×'; }
+	.titlebar:hover .yellow::after { content: '−'; }
+	.titlebar:hover .green::after { content: '+'; }
+
+	.red { background: #ff5f56; }
+	.yellow { background: #ffbd2e; }
+	.green { background: #27c93f; }
+
+	.title {
+		margin-left: auto;
+		margin-right: auto;
+		color: var(--muted);
+		font-size: 0.8rem;
+	}
+
+	.body {
+		display: flex;
+		align-items: center;
+		gap: 1.75rem;
+		padding: 1.5rem;
+	}
+
+	.avatar {
+		flex-shrink: 0;
+		width: 160px;
+		height: 160px;
+		border-radius: 50%;
+		overflow: hidden;
+		border: 2px solid var(--accent);
+	}
+
+	/* zoom in on the face, which sits right of center in the photo */
+	.avatar img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		transform: scale(1.4);
+		transform-origin: 64% 44%;
+	}
+
+	.text {
+		min-width: 0;
+	}
+
+	.fetch {
+		display: none;
+		flex-shrink: 0;
+		margin-left: auto;
+		padding-left: 1.5rem;
+		border-left: 1px dashed var(--border);
+		font-size: 0.875rem;
+	}
+
+	@media (min-width: 1000px) {
+		.fetch {
+			display: block;
+		}
+	}
+
+	.fetch-title {
+		color: var(--accent);
+		font-weight: 700;
+		margin-top: 0.5rem !important;
+	}
+
+	.fetch-title span {
+		color: var(--text);
+	}
+
+	.rule {
+		color: var(--muted);
+		line-height: 1;
+	}
+
+	.fetch dl {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: 0 0.5rem;
+		margin: 0.4rem 0 0.75rem;
+	}
+
+	.fetch dt {
+		color: var(--accent-2);
+		font-weight: 700;
+	}
+
+	.fetch dt::after {
+		content: ':';
+		color: var(--text);
+		font-weight: 400;
+	}
+
+	.fetch dd {
+		margin: 0;
+		white-space: nowrap;
+	}
+
+	.swatches {
+		display: flex;
+	}
+
+	.swatches span {
+		width: 1.5rem;
+		height: 0.9rem;
+	}
+
+	@media (max-width: 600px) {
+		.body {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 1.25rem;
+		}
+
+		.avatar {
+			width: 120px;
+			height: 120px;
+		}
+	}
+
+	.body p {
+		margin: 0;
+	}
+
+	h1 {
+		font-size: clamp(1.8rem, 6vw, 3rem);
+		color: var(--accent);
+		margin: 0.25rem 0 1rem;
+	}
+</style>

@@ -1,0 +1,185 @@
+---
+import { profile } from '../data/site';
+---
+
+<div class="terminal" data-terminal>
+	<div class="out" role="log" aria-live="polite"></div>
+	<div class="input-line">
+		<span class="ps1"><span class="user">{profile.handle}@portfolio</span>:<span class="path">~</span>$</span>
+		<span class="field" aria-hidden="true"><span class="before"></span><span class="at">&nbsp;</span><span class="after"></span></span>
+		<input
+			type="text"
+			aria-label="Terminal command"
+			autocomplete="off"
+			autocapitalize="off"
+			autocorrect="off"
+			spellcheck="false"
+			enterkeyhint="go"
+		/>
+	</div>
+</div>
+
+<script>
+	import { initTerminal } from '../scripts/terminal';
+
+	const root = document.querySelector<HTMLElement>('[data-terminal]');
+	if (root) initTerminal(root);
+</script>
+
+<!-- global because the output lines are created at runtime, outside Astro's scoping -->
+<style is:global>
+	.terminal {
+		border-top: 1px solid var(--border);
+		padding: 1rem 1.5rem 1.25rem;
+		font-size: 0.875rem;
+		line-height: 1.6;
+		cursor: text;
+	}
+
+	/* tall enough for the longest output (help) on desktop */
+	.terminal .out {
+		position: relative;
+		max-height: 26rem;
+		overflow-y: auto;
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+
+	/* narrow screens wrap more, so give the output more height */
+	@media (max-width: 600px) {
+		.terminal .out {
+			max-height: 75svh;
+		}
+	}
+
+	.terminal .line {
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.terminal .input-line {
+		position: relative;
+		display: flex;
+		gap: 1ch;
+	}
+
+	.terminal.busy .input-line {
+		visibility: hidden;
+	}
+
+	/* the real input sits invisibly on top; we draw the text and block cursor ourselves */
+	.terminal input {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		opacity: 0;
+		font-size: 16px; /* stops iOS zooming in on focus */
+		border: 0;
+		padding: 0;
+		cursor: text;
+	}
+
+	.terminal .field {
+		flex: 1;
+		min-width: 0;
+		white-space: pre;
+		overflow: hidden;
+	}
+
+	.terminal .at {
+		outline: 1px solid var(--muted);
+		outline-offset: -1px;
+	}
+
+	.terminal.focused .at {
+		outline: none;
+		background: var(--text);
+		color: var(--bg);
+		animation: term-blink 1s steps(1) infinite;
+	}
+
+	@keyframes term-blink {
+		50% {
+			background: transparent;
+			color: var(--text);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.terminal.focused .at {
+			animation: none;
+		}
+	}
+
+	.terminal .run {
+		font: inherit;
+		color: var(--accent-2);
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+		text-decoration: underline dotted;
+		text-underline-offset: 3px;
+	}
+
+	.terminal .run:hover {
+		color: var(--text);
+	}
+
+	.terminal .user,
+	.terminal .accent {
+		color: var(--accent);
+	}
+
+	.terminal .path,
+	.terminal .key {
+		color: var(--accent-2);
+	}
+
+	.terminal .dir {
+		color: var(--accent-2);
+		font-weight: 700;
+	}
+
+	.terminal .file {
+		color: var(--text);
+	}
+
+	.terminal .str,
+	.terminal .warn {
+		color: var(--warn);
+	}
+
+	.terminal .muted {
+		color: var(--muted);
+	}
+
+	.terminal .err {
+		color: #ff7b72;
+	}
+
+	.terminal .sw0 { background: #ff5f56; }
+	.terminal .sw1 { background: #ffbd2e; }
+	.terminal .sw2 { background: #27c93f; }
+	.terminal .sw3 { background: #58a6ff; }
+	.terminal .sw4 { background: #bc8cff; }
+	.terminal .sw5 { background: #39c5cf; }
+	.terminal .sw6 { background: #c9d1d9; }
+
+	/* maximized: the terminal fills the window */
+	.window.maximized .terminal {
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+	}
+
+	.window.maximized .terminal .out {
+		flex: 1;
+		max-height: none;
+	}
+
+	html.terminal-maximized {
+		overflow: hidden;
+	}
+</style>
