@@ -175,6 +175,7 @@ export const homelab = {
 						{ name: 'Minecraft (vanilla)', desc: 'A vanilla Minecraft server for friends, running in its own Docker container with the world saved on the TrueNAS pool.' },
 						{ name: 'Minecraft (modded)', desc: 'A modded Minecraft server for friends. Mods lean hard on a single CPU core, which is why it runs on the node picked for single-core speed.' },
 						{ name: 'Arma 3 Antistasi', desc: "Dedicated server for Arma 3's Antistasi co-op campaign." },
+						{ name: 'DDNS', desc: 'Keeps the DNS records for the Minecraft and Arma servers pointed at my home IP whenever it changes, so friends always connect with the same address, like arma.robbywarner.com.' },
 					],
 				},
 			],
