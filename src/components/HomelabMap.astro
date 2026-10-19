@@ -579,10 +579,14 @@ const mapData = {
 		fill: var(--bg);
 	}
 
-	.node:hover > rect,
-	.node:focus-visible > rect,
+	.map:not(.playing) .node:hover > rect,
+	.map:not(.playing) .node:focus-visible > rect,
 	.node.lit > rect {
 		stroke: var(--accent);
+	}
+
+	.map.playing .node {
+		cursor: default;
 	}
 
 	.chip.lit > rect {

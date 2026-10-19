@@ -22,6 +22,12 @@ export function initHomelabMap(root: HTMLElement) {
 	let run = 0; // bumped to cancel whatever animation is playing
 	let pinned: string | null = null;
 	let focused: string | null = null;
+	let playing = false; // boxes ignore hover, focus and taps while a trace runs
+
+	function setPlaying(on: boolean) {
+		playing = on;
+		svgs.forEach((svg) => svg.classList.toggle('playing', on));
+	}
 
 	// only one of the two layouts (wide/tall) is displayed at a time
 	const visibleSvg = () => svgs.find((svg) => svg.getBoundingClientRect().width > 0) ?? svgs[0];
@@ -96,6 +102,7 @@ export function initHomelabMap(root: HTMLElement) {
 	async function play(flowId: string) {
 		const me = ++run;
 		focused = null;
+		setPlaying(true);
 		const flow = data.flows[flowId];
 		clearHighlight();
 		buttons.forEach((b) => b.classList.toggle('active', b.dataset.play === flowId));
@@ -150,6 +157,7 @@ export function initHomelabMap(root: HTMLElement) {
 		// hold the finished trace briefly, then clear it and release the button together
 		await sleep(1500);
 		if (me !== run) return;
+		setPlaying(false);
 		clearHighlight();
 		showDefault();
 	}
@@ -167,14 +175,17 @@ export function initHomelabMap(root: HTMLElement) {
 		svg.querySelectorAll<SVGGElement>('.node').forEach((node) => {
 			const id = node.dataset.id!;
 			node.addEventListener('pointerenter', () => {
-				if (!pinned) focusBox(id);
+				if (!pinned && !playing) focusBox(id);
 			});
 			node.addEventListener('pointerleave', unfocus);
-			node.addEventListener('focus', () => focusBox(id));
+			node.addEventListener('focus', () => {
+				if (!playing) focusBox(id);
+			});
 			node.addEventListener('blur', unfocus);
 			node.addEventListener('click', (event) => {
 				// taps pin the info open, since touch screens have no hover
 				event.stopPropagation();
+				if (playing) return;
 				pinned = pinned === id ? null : id;
 				if (pinned) focusBox(id);
 				else unfocus();
