@@ -97,13 +97,16 @@ export const projects: {
 // and every service gets its own box. Flows are the animated traffic traces: lists of
 // box ids (a service or VM name in lowercase-with-dashes, or 'internet', 'lan', 'remote').
 // `storage: true` on a VM or service draws a dashed link to the TrueNAS pool.
+// `stack: true` on a host stacks its VMs in one column on desktop, for small VMs.
+// `datastore` on a VM draws a single local disk of that size.
 export const homelab = {
 	hosts: [
 		{
 			id: 'mini',
 			name: 'Mac mini',
-			meta: 'Intel · network node',
-			desc: 'An Intel Mac mini I got for free. I moved DNS and the reverse proxy here so they keep working when the main server is down.',
+			meta: 'Intel · network + backup node',
+			stack: true,
+			desc: 'An Intel Mac mini I got for free. DNS, the reverse proxy, and backups live here so they keep working when the main server is down.',
 			vms: [
 				{
 					name: 'network',
@@ -113,6 +116,12 @@ export const homelab = {
 						{ name: 'AdGuard Home', desc: 'DNS with ad and tracker blocking, plus friendly .home names for every service. Only my machines use it, so a lab outage never takes down the rest of the house.' },
 						{ name: 'Nginx Proxy Manager', desc: 'Reverse proxy that gives every web UI a friendly .home address instead of an IP and port.' },
 					],
+				},
+				{
+					name: 'backup',
+					os: 'Proxmox Backup Server',
+					desc: "Backs up every other VM in the cluster daily to a 400 GB local disk on the Mac mini, keeping 7 daily, 4 weekly, and 6 monthly backups. TrueNAS is backed up by its boot disk only, not the 8-drive pool. If something catastrophic happens, any VM can be restored from here.",
+					datastore: '400 GB',
 				},
 			],
 		},
@@ -211,6 +220,12 @@ export const homelab = {
 			title: 'Game session',
 			desc: 'Friends connect to the modded Minecraft server, which runs on the node chosen for single-core speed and keeps its data on the TrueNAS pool.',
 			path: ['internet', 'lan', 'minecraft-modded', 'truenas-scale'],
+		},
+		{
+			id: 'backup',
+			title: 'Daily backup',
+			desc: "Once a day, every VM in the cluster except the backup VM itself is backed up to Proxmox Backup Server's 400 GB local disk on the Mac mini. It keeps 7 daily, 4 weekly, and 6 monthly backups.",
+			path: ['network', 'truenas-scale', 'apps', 'media', 'games', 'backup'],
 		},
 	],
 };

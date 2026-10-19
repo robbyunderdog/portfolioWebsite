@@ -69,6 +69,11 @@ function buildVm(vm: VmData, x: number, y: number, w: number, cols: number): Vm 
 		}));
 		bodyH = Math.ceil(vm.pool.disks / perRow) * (DISK_H + CHIP_GAP) + 16;
 		poolLabel = `${vm.pool.layout} · ${vm.pool.disks} × ${vm.pool.size}`;
+	} else if (vm.datastore) {
+		// a single local disk, drawn full width
+		disks = [{ x: x + VM_PAD, y: y + VM_HEAD, w: w - 2 * VM_PAD - GUTTER, h: DISK_H }];
+		bodyH = DISK_H + CHIP_GAP + 16;
+		poolLabel = `datastore · ${vm.datastore}`;
 	}
 
 	return { id: slug(vm.name), name: vm.name, os: vm.os, x, y, w, h: VM_HEAD + bodyH + VM_PAD, chips, disks, poolLabel };
@@ -96,27 +101,37 @@ function wideLayout(): Layout {
 	const width = 1100;
 	const margin = 12;
 	const hostCount = homelab.hosts.length;
-	const vmCount = homelab.hosts.reduce((n, h) => n + h.vms.length, 0);
+	// hosts marked `stack` put their VMs in one column instead of side by side
+	const cols = (h: HostData) => (h.stack ? 1 : h.vms.length);
+	const colCount = homelab.hosts.reduce((n, h) => n + cols(h), 0);
 	const colW =
-		(width - 2 * margin - (vmCount - hostCount) * VM_GAP - hostCount * 2 * HOST_PAD - (hostCount - 1) * HOST_GAP) / vmCount;
+		(width - 2 * margin - (colCount - hostCount) * VM_GAP - hostCount * 2 * HOST_PAD - (hostCount - 1) * HOST_GAP) / colCount;
 	const busY = 160;
 	const clusterY = 180;
 	const hostY = 200;
+	const vmY = hostY + HOST_HEAD;
 
 	let x = margin;
 	const hosts: Host[] = homelab.hosts.map((h) => {
-		const vms = h.vms.map((vm, i) => buildVm(vm, x + HOST_PAD + i * (colW + VM_GAP), hostY + HOST_HEAD, colW, 1));
-		const w = h.vms.length * colW + (h.vms.length - 1) * VM_GAP + 2 * HOST_PAD;
+		let vy = vmY;
+		const vms = h.vms.map((vm, i) => {
+			if (!h.stack) return buildVm(vm, x + HOST_PAD + i * (colW + VM_GAP), vmY, colW, 1);
+			const box = buildVm(vm, x + HOST_PAD, vy, colW, 1);
+			vy += box.h + VM_GAP;
+			return box;
+		});
+		const w = cols(h) * colW + (cols(h) - 1) * VM_GAP + 2 * HOST_PAD;
 		const host = { id: h.id, name: h.name, meta: h.meta, x, y: hostY, w, h: 0, vms };
 		x += w + HOST_GAP;
 		return host;
 	});
-	// give every VM and host the same height so the row lines up
-	const vmH = Math.max(...hosts.flatMap((h) => h.vms.map((v) => v.h)));
-	for (const h of hosts) {
-		h.h = HOST_HEAD + vmH + HOST_PAD;
-		h.vms.forEach((v) => (v.h = vmH));
-	}
+	// give every host the same height and stretch the VMs to fill it, so the row lines up
+	const bottom = Math.max(...hosts.flatMap((h) => h.vms.map((v) => v.y + v.h)));
+	hosts.forEach((h, hi) => {
+		h.h = bottom - hostY + HOST_PAD;
+		const stretch = homelab.hosts[hi].stack ? h.vms.slice(-1) : h.vms;
+		stretch.forEach((v) => (v.h = bottom - v.y));
+	});
 
 	const tops = {
 		internet: { x: width / 2 - 80, y: 8, w: 160, h: 40, label: 'internet' },
@@ -207,8 +222,8 @@ function route(layout: Layout, from: string, to: string): Pt[] {
 	const b = layout.anchors[to];
 	if (!a || !b) throw new Error(`homelab flow references unknown box "${!a ? from : to}"`);
 	if (a.top && b.top) return [[a.cx, a.cy], [b.cx, b.cy]];
-	// same VM, or same host on phones (where a host's VMs are stacked and share a gutter)
-	if (a.vm && (a.vm === b.vm || (layout.name === 'tall' && a.host === b.host))) {
+	// same VM, or stacked VMs on the same host that share a gutter
+	if (a.vm && a.host === b.host && a.gutter === b.gutter) {
 		return [[a.cx, a.cy], [a.gutter!, a.cy], [a.gutter!, b.cy], [b.cx, b.cy]];
 	}
 	if (a.host && a.host === b.host) {
